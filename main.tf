@@ -91,6 +91,11 @@ resource "aws_security_group" "web" {
   }
 }
 
+# Generate a random suffix for global uniqueness
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
 # Create an S3 bucket for logs
 resource "aws_s3_bucket" "logs" {
   bucket = "tf-jenkins-server-logs-${random_id.suffix.hex}"
@@ -110,7 +115,52 @@ resource "aws_s3_bucket_public_access_block" "logs" {
   restrict_public_buckets = true
 }
 
-# Create the IAM Policy Document
+# Create an S3 bucket for Jenkins backups
+resource "aws_s3_bucket" "jenkins_backup" {
+  bucket = "tf-jenkins-backup-${random_id.suffix.hex}"
+
+  tags = {
+    Name = "tf-jenkins-backup"
+  }
+}
+
+# Block public access to the backup bucket
+resource "aws_s3_bucket_public_access_block" "jenkins_backup" {
+  bucket = aws_s3_bucket.jenkins_backup.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Enable versioning for backup bucket
+resource "aws_s3_bucket_versioning" "jenkins_backup" {
+  bucket = aws_s3_bucket.jenkins_backup.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Lifecycle configuration for backup retention
+resource "aws_s3_bucket_lifecycle_configuration" "jenkins_backup" {
+  bucket = aws_s3_bucket.jenkins_backup.id
+
+  rule {
+    id     = "backup_retention"
+    status = "Enabled"
+
+    expiration {
+      days = 30
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+  }
+}
+
+# Create the IAM Policy Document (MERGED - includes both logs and backup bucket access)
 data "aws_iam_policy_document" "ec2_s3_upload_policy" {
   statement {
     sid = "AllowEC2ToUploadLogs"
@@ -118,7 +168,7 @@ data "aws_iam_policy_document" "ec2_s3_upload_policy" {
       "s3:PutObject",
     ]
     resources = [
-      "${aws_s3_bucket.logs.arn}/*", # Replace with your S3 bucket arn name
+      "${aws_s3_bucket.logs.arn}/*",
     ]
   }
 
@@ -128,7 +178,21 @@ data "aws_iam_policy_document" "ec2_s3_upload_policy" {
       "s3:ListBucket",
     ]
     resources = [
-      "${aws_s3_bucket.logs.arn}", # Replace with your S3 bucket arn name
+      "${aws_s3_bucket.logs.arn}",
+    ]
+  }
+
+  statement {
+    sid = "AllowJenkinsBackupAccess"
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:DeleteObject",
+      "s3:ListBucket"
+    ]
+    resources = [
+      "${aws_s3_bucket.jenkins_backup.arn}",
+      "${aws_s3_bucket.jenkins_backup.arn}/*"
     ]
   }
 }
@@ -201,21 +265,15 @@ resource "aws_eip" "web" {
 
   depends_on = [aws_internet_gateway.igw]
 
-  lifecycle {
-    prevent_destroy = true
-    ignore_changes = [
-      tags,
-    ]
-  }
+#  lifecycle {
+#    prevent_destroy = true
+#    ignore_changes = [
+#      tags,
+#    ]
+#  }
 }
 
-# Associate Elastic IP with EC2 instance
-resource "aws_eip_association" "web" {
-  instance_id   = aws_instance.web.id
-  allocation_id = local.eip_allocation_id
-}
-
-# Create an EC2 instance
+# Create an EC2 instance (MERGED - single instance definition)
 resource "aws_instance" "web" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_s3_uploader_profile.name
   ami                    = "ami-0f918f7e67a3323f0"
@@ -223,23 +281,19 @@ resource "aws_instance" "web" {
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.web.id]
   key_name               = "ap-south-1"
-  user_data              = <<-EOF
-    #!/bin/bash
-    sudo apt update -y
-    sudo apt install ansible wget -y
-    ansible-galaxy role install moreskylab.jenkins-ssl
-    wget https://raw.githubusercontent.com/moreskylab/ansible-role-jenkins-ssl/refs/heads/main/test/main.yaml
-    ansible-playbook main.yaml -e "jenkins_domain=myjenkins.altgr.in"
-  EOF
+  user_data = base64encode(templatefile("${path.module}/jenkins-setup.sh", {
+    backup_bucket = aws_s3_bucket.jenkins_backup.bucket
+  }))
 
   tags = {
     Name = "tf-jenkins-server"
   }
 }
 
-# Generate a random suffix for global uniqueness
-resource "random_id" "suffix" {
-  byte_length = 4
+# Associate Elastic IP with EC2 instance
+resource "aws_eip_association" "web" {
+  instance_id   = aws_instance.web.id
+  allocation_id = local.eip_allocation_id
 }
 
 # Output the web server's public IP (from either new or existing EIP)
@@ -256,4 +310,20 @@ output "web_server_eip_allocation_id" {
 # Output the S3 bucket name
 output "logs_bucket" {
   value = aws_s3_bucket.logs.bucket
+}
+
+# Output the backup bucket name
+output "jenkins_backup_bucket" {
+  description = "S3 bucket for Jenkins backups"
+  value       = aws_s3_bucket.jenkins_backup.bucket
+}
+
+# Output backup commands
+output "backup_commands" {
+  description = "Commands to manage Jenkins backups"
+  value = {
+    manual_backup = "sudo /opt/jenkins-backup/backup-jenkins.sh ${aws_s3_bucket.jenkins_backup.bucket}"
+    list_backups  = "/opt/jenkins-backup/list-backups.sh ${aws_s3_bucket.jenkins_backup.bucket}"
+    restore_example = "sudo /opt/jenkins-backup/restore-jenkins.sh ${aws_s3_bucket.jenkins_backup.bucket} jenkins-backup-YYYYMMDD_HHMMSS.tar.gz"
+  }
 }
