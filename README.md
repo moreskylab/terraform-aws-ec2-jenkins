@@ -24,16 +24,6 @@ Output:-
 ![jenkins_v2.516.1](images/jenkins_v2.516.1.png)
 
 
----
+## Architecture Diagram
 
-If still facing error try manually running ansible playbook
-
-[https://github.com/moreskylab/ansible-role-jenkins-ssl](https://github.com/moreskylab/ansible-role-jenkins-ssl)
-
-```bash
-sudo apt update -y
-sudo apt install ansible wget -y
-ansible-galaxy role install moreskylab.jenkins-ssl
-wget https://raw.githubusercontent.com/moreskylab/ansible-role-jenkins-ssl/refs/heads/main/test/main.yaml
-ansible-playbook main.yaml -e "jenkins_domain=myjenkins.altgr.in"
-```
+![jenkins_architecture](images/architecture_diagram.png)
