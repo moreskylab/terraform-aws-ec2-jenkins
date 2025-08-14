@@ -16,7 +16,7 @@ sudo ./aws/install
 # Install Jenkins using Ansible
 ansible-galaxy role install moreskylab.jenkins-ssl
 wget https://raw.githubusercontent.com/moreskylab/ansible-role-jenkins-ssl/refs/heads/main/test/main.yaml
-ansible-playbook main.yaml -e "jenkins_domain=myjenkins.altgr.in"
+ansible-playbook main.yaml -e "jenkins_domain=mynewjenkins.altgr.in"
 
 # Wait for Jenkins to start
 sleep 60

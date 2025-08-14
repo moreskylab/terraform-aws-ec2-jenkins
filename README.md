@@ -7,6 +7,12 @@ this will create ubuntu 24.04 LTS EC2 instance and install jenkins version `2.51
 terraform apply -auto-approve
 ```
 
+```bash
+terraform state rm aws_eip_association.web
+terraform state rm aws_eip.web[0]
+terraform destroy -auto-approve
+```
+
 > **NOTE**:- need to configure subdomain with elastic ip generated as output in your domain provider(Godaddy, Route53 etc.) for Letsencrypt SSL generation followed by nginx reverse proxy configuration.
 
 Configure Domain
@@ -29,5 +35,5 @@ sudo apt update -y
 sudo apt install ansible wget -y
 ansible-galaxy role install moreskylab.jenkins-ssl
 wget https://raw.githubusercontent.com/moreskylab/ansible-role-jenkins-ssl/refs/heads/main/test/main.yaml
-ansible-playbook main.yaml
+ansible-playbook main.yaml -e "jenkins_domain=myjenkins.altgr.in"
 ```
