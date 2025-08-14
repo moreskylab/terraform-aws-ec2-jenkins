@@ -99,6 +99,7 @@ resource "random_id" "suffix" {
 # Create an S3 bucket for logs
 resource "aws_s3_bucket" "logs" {
   bucket = "tf-jenkins-server-logs-${random_id.suffix.hex}"
+  force_destroy = true
 
   tags = {
     Name = "tf-jenkins-server-logs"
@@ -118,6 +119,7 @@ resource "aws_s3_bucket_public_access_block" "logs" {
 # Create an S3 bucket for Jenkins backups
 resource "aws_s3_bucket" "jenkins_backup" {
   bucket = "tf-jenkins-backup-${random_id.suffix.hex}"
+  force_destroy = true
 
   tags = {
     Name = "tf-jenkins-backup"
@@ -265,12 +267,12 @@ resource "aws_eip" "web" {
 
   depends_on = [aws_internet_gateway.igw]
 
-#  lifecycle {
-#    prevent_destroy = true
-#    ignore_changes = [
-#      tags,
-#    ]
-#  }
+ lifecycle {
+   prevent_destroy = true
+   ignore_changes = [
+     tags,
+   ]
+ }
 }
 
 # Create an EC2 instance (MERGED - single instance definition)
@@ -284,6 +286,13 @@ resource "aws_instance" "web" {
   user_data = base64encode(templatefile("${path.module}/jenkins-setup.sh", {
     backup_bucket = aws_s3_bucket.jenkins_backup.bucket
   }))
+
+  root_block_device {
+    volume_type = "gp3"
+    volume_size = 50
+    encrypted   = true
+    delete_on_termination = true
+  }
 
   tags = {
     Name = "tf-jenkins-server"
