@@ -40,7 +40,7 @@ wget https://raw.githubusercontent.com/moreskylab/ansible-role-jenkins-ssl/refs/
 ansible-playbook main.yaml -e "jenkins_domain=<YOUR_DOMAIN_NAME>"
 ```
 
-> **NOTE**:- need to configure subdomain with elastic ip generated as output in your domain provider(Godaddy, Route53 etc.) for Letsencrypt SSL generation followed by nginx reverse proxy configuration.
+> **NOTE**:- need to configure an 'A' record mapped to the elastic IP to the domain provider, e.g., GoDaddy, Route53, etc., for Let's Encrypt SSL generation, followed by nginx reverse proxy configuration with same SSL certificate.
 
 Configure Domain
 
