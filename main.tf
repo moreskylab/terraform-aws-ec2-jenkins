@@ -152,6 +152,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "jenkins_backup" {
     id     = "backup_retention"
     status = "Enabled"
 
+    filter {
+      prefix = ""
+    }
+
     expiration {
       days = 30
     }
