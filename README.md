@@ -22,6 +22,8 @@ Output:-
 
 If still facing error try manually running ansible playbook
 
+[https://github.com/moreskylab/ansible-role-jenkins-ssl](https://github.com/moreskylab/ansible-role-jenkins-ssl)
+
 ```bash
 sudo apt update -y
 sudo apt install ansible wget -y
