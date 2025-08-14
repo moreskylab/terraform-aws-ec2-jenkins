@@ -8,7 +8,7 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
 
   tags = {
-    Name = "tf-main-vpc"
+    Name = "tf-jenkins-main-vpc"
   }
 }
 
@@ -20,7 +20,7 @@ resource "aws_subnet" "public" {
   availability_zone       = "ap-south-1a"
 
   tags = {
-    Name = "tf-public-subnet"
+    Name = "tf-jenkins-public-subnet"
   }
 }
 
@@ -29,7 +29,7 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "tf-main-igw"
+    Name = "tf-jenkins-main-igw"
   }
 }
 
@@ -43,7 +43,7 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "tf-public-rt"
+    Name = "tf-jenkins-public-rt"
   }
 }
 
@@ -55,7 +55,7 @@ resource "aws_route_table_association" "public" {
 
 # Create a security group
 resource "aws_security_group" "web" {
-  name        = "tf-web-sg"
+  name        = "tf-jenkins-web-sg"
   description = "Allow web traffic"
   vpc_id      = aws_vpc.main.id
 
@@ -93,10 +93,10 @@ resource "aws_security_group" "web" {
 
 # Create an S3 bucket for logs
 resource "aws_s3_bucket" "logs" {
-  bucket = "tf-web-server-logs-${random_id.suffix.hex}"
+  bucket = "tf-jenkins-server-logs-${random_id.suffix.hex}"
 
   tags = {
-    Name = "tf-web-server-logs"
+    Name = "tf-jenkins-server-logs"
   }
 }
 
@@ -182,7 +182,7 @@ resource "aws_eip" "web" {
   domain   = "vpc"
 
   tags = {
-    Name = "tf-web-server-eip"
+    Name = "tf-jenkins-server-eip"
   }
 
   # Ensure the internet gateway is created before the EIP
@@ -213,7 +213,7 @@ resource "aws_instance" "web" {
   EOF
 
   tags = {
-    Name = "tf-web-server"
+    Name = "tf-jenkins-server"
   }
 }
 
