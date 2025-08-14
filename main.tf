@@ -170,10 +170,8 @@ resource "aws_iam_instance_profile" "ec2_s3_uploader_profile" {
   role = aws_iam_role.ec2_s3_uploader_role.name
 }
 
-# Try to find existing Elastic IP by tag (use try() to handle when none exists)
-data "aws_eip" "existing" {
-  count = 1
-  
+# Try to find existing Elastic IP by tag (handle case when none exists)
+data "aws_eips" "existing" {
   filter {
     name   = "tag:Name"
     values = ["tf-jenkins-server-eip"]
@@ -182,7 +180,14 @@ data "aws_eip" "existing" {
 
 # Check if existing EIP was found
 locals {
-  existing_eip_found = length(data.aws_eip.existing) > 0 && length(data.aws_eip.existing[0].id) > 0
+  existing_eip_found = length(data.aws_eips.existing.allocation_ids) > 0
+  eip_allocation_id  = local.existing_eip_found ? data.aws_eips.existing.allocation_ids[0] : aws_eip.web[0].id
+}
+
+# Get details of existing EIP if found
+data "aws_eip" "existing_details" {
+  count = local.existing_eip_found ? 1 : 0
+  id    = data.aws_eips.existing.allocation_ids[0]
 }
 
 # Create a new Elastic IP only if not found
@@ -198,13 +203,16 @@ resource "aws_eip" "web" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [
+      tags,
+    ]
   }
 }
 
 # Associate Elastic IP with EC2 instance
 resource "aws_eip_association" "web" {
   instance_id   = aws_instance.web.id
-  allocation_id = local.existing_eip_found ? data.aws_eip.existing[0].id : aws_eip.web[0].id
+  allocation_id = local.eip_allocation_id
 }
 
 # Create an EC2 instance
@@ -237,12 +245,12 @@ resource "random_id" "suffix" {
 # Output the web server's public IP (from either new or existing EIP)
 output "web_server_public_ip" {
   description = "Elastic IP address of the web server"
-  value       = local.existing_eip_found ? data.aws_eip.existing[0].public_ip : aws_eip.web[0].public_ip
+  value       = local.existing_eip_found ? data.aws_eip.existing_details[0].public_ip : aws_eip.web[0].public_ip
 }
 
 output "web_server_eip_allocation_id" {
   description = "Allocation ID of the Elastic IP"
-  value       = local.existing_eip_found ? data.aws_eip.existing[0].id : aws_eip.web[0].id
+  value       = local.eip_allocation_id
 }
 
 # Output the S3 bucket name
